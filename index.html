@@ -1,0 +1,267 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf8">
+    <title>{ o _ o }</title>
+
+    <style>
+        html {
+            width: 100vw;
+            height: 100vh;
+        }
+        body {
+            width: 100vw;
+            height: 100vh;
+            margin: 0;
+        }
+
+        #root {
+            width: 100%;
+            height: 100%;
+        }
+
+        .juice {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+            .juice .editor {
+                width: 50%;
+                height: 100%;
+                position: absolute;
+                top: 0;
+                left: 0;
+            }
+            .juice .viewer {
+                width: 50%;
+                height: 100%;
+                padding: 0;
+                margin: 0;
+                position: absolute;
+                top: 0;
+                right: 0;
+                overflow: scroll;
+                font: 12px/normal 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+            }
+                .juice .viewer .body {
+                    padding-left: 24px;
+                }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mithril/2.0.4/mithril.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.6/ace.js"></script>
+    <script>
+        (function() {
+            var buffer = {
+                value: '{"firstName": "Rack", "lastName": "Jackon", "gender": "man", "age": 24, "address": {"streetAddress": "126", "city": "San Jone", "state": "CA", "postalCode": "394221"}, "phoneNumbers": [{"type": "home", "number": "7383627627" }]}',
+                update: function(value) {
+                    buffer.value = value
+                }
+            }
+
+            function Editor() {
+                var editor
+
+                return {
+                    oncreate: function(vnode) {
+                        editor = ace.edit(vnode.dom)
+
+                        editor.on("change", function(e) {
+                            buffer.update(editor.getValue())
+                            m.redraw()
+                        })
+                        editor.setValue(buffer.value)
+
+                        editor.focus()
+                    },
+                    onremove: function() {
+                        editor.destroy()
+                    },
+                    view: function(vnode) {
+                        return m('.editor')
+                    }
+                }
+            }
+
+            function node_type(value) {
+                var type = typeof value
+                if (type == 'boolean') {
+                    return JsonBooleanNode
+                }
+                else if (type == 'number' || type == 'bigint') {
+                    return JsonNumberNode
+                }
+                else if (type == 'string') {
+                    return JsonStringNode
+                }
+                else {
+                    if (value === null) {
+                        return JsonNullNode
+                    }
+                    else if (Array.isArray(value)) {
+                        return JsonArrayNode
+                    }
+                    else {
+                        return JsonObjectNode
+                    }
+                }
+            }
+
+            function JsonNullNode() {
+                return {
+                    view: function(vnode) {
+                        return m(
+                            '.node.node--null',
+                            (vnode.attrs.property ? (vnode.attrs.property + ': ') : '') + 'null'
+                        )
+                    }
+                }
+            }
+
+            function JsonBooleanNode() {
+                return {
+                    view: function(vnode) {
+                        return m(
+                            '.node.node--boolean',
+                            (vnode.attrs.property ? (vnode.attrs.property + ': ') : '') + vnode.attrs.value.toString()
+                        )
+                    }
+                }
+            }
+
+            function JsonNumberNode() {
+                return {
+                    view: function(vnode) {
+                        return m(
+                            '.node.node--number',
+                            (vnode.attrs.property ? (vnode.attrs.property + ': ') : '') + vnode.attrs.value.toString()
+                        )
+                    }
+                }
+            }
+
+            function JsonStringNode() {
+                return {
+                    view: function(vnode) {
+                        return m(
+                            '.node.node--string',
+                            (vnode.attrs.property ? (vnode.attrs.property + ': ') : '') + vnode.attrs.value.toString()
+                        )
+                    }
+                }
+            }
+
+            function JsonArrayNode() {
+                return {
+                    view: function(vnode) {
+                        return m(
+                            '.node.node--array',
+                            [
+                                m(
+                                    '.start.start--array',
+                                    (vnode.attrs.property ? (vnode.attrs.property + ': ') : '') + '['
+                                ),
+                                m(
+                                    '.body.body--array',
+                                    vnode.attrs.value.map(function(value, index) {
+                                        return m(
+                                            node_type(value),
+                                            {
+                                                key: index,
+                                                value: value
+                                            }
+                                        )
+                                    })
+                                ),
+                                m(
+                                    '.end.end--array',
+                                    ']'
+                                )
+                            ]
+                        )
+                    }
+                }
+            }
+
+            function JsonObjectNode() {
+                return {
+                    view: function(vnode) {
+                        return m(
+                            '.node.node--object',
+                            [
+                                m(
+                                    '.start--object',
+                                    (vnode.attrs.property ? (vnode.attrs.property + ': ') : '') + '{'
+                                ),
+                                m(
+                                    '.body.body--object',
+                                    Object.keys(vnode.attrs.value).map(function(key) {
+                                        var value = vnode.attrs.value[key]
+                                        return m(
+                                            node_type(value),
+                                            {
+                                                key: key,
+                                                property: key,
+                                                value: value
+                                            }
+                                        )
+                                    })
+                                ),
+                                m(
+                                    '.end.end--object',
+                                    '}'
+                                )
+                            ]
+                        )
+                    }
+                }
+            }
+
+            function JsonRootNode() {
+                return {
+                    view: function(vnode) {
+                        return m(
+                            '.node.node--root',
+                            m(node_type(vnode.attrs.value), {value: vnode.attrs.value})
+                        )
+                    }
+                }
+            }
+
+            function Viewer() {
+                return {
+                    view: function(vnode) {
+                        var value = ''
+                        try {
+                            value = JSON.parse(vnode.attrs.value)
+                        }
+                        catch (error) {
+                            console.log(error)
+                        }
+                        return m('.viewer', m(JsonRootNode, {value: value}))
+                    }
+                }
+            }
+
+            function Juice() {
+                return {
+                    view: function() {
+                        return m(
+                            '.juice',
+                            [
+                                m(Editor),
+                                m(Viewer, {value: buffer.value}),
+                            ]
+                        )
+                    }
+                }
+            }
+
+            m.mount(document.getElementById("root"), Juice)
+        })()
+    </script>
+</body>
+</html>
